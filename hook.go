@@ -3,6 +3,7 @@ package elogrus
 import (
 	"context"
 	"fmt"
+	"github.com/graniticio/granitic/ws/json"
 	"strings"
 	"time"
 
@@ -18,6 +19,9 @@ var (
 // IndexNameFunc get index name
 type IndexNameFunc func() string
 
+// MessageTransformer transforms the content that is sent to elasticsearch
+type MessageTransformer func(Message)
+
 type fireFunc func(entry *logrus.Entry, hook *ElasticHook) error
 
 // ElasticHook is a logrus
@@ -32,12 +36,12 @@ type ElasticHook struct {
 	fireFunc  fireFunc
 }
 
-type message struct {
-	Host      string
+type Message struct {
+	logrus.Fields
+	Host      string `json:host`
 	Timestamp string `json:"@timestamp"`
-	Message   string
-	Data      logrus.Fields
-	Level     string
+	Message   string `json:message`
+	Level     string `json:level`
 }
 
 // NewElasticHook creates new hook.
@@ -164,7 +168,7 @@ func asyncFireFunc(entry *logrus.Entry, hook *ElasticHook) error {
 	return nil
 }
 
-func createMessage(entry *logrus.Entry, hook *ElasticHook) *message {
+func createMessage(entry *logrus.Entry, hook *ElasticHook) *map[string]interface{} {
 	level := entry.Level.String()
 
 	if e, ok := entry.Data[logrus.ErrorKey]; ok && e != nil {
@@ -172,14 +176,25 @@ func createMessage(entry *logrus.Entry, hook *ElasticHook) *message {
 			entry.Data[logrus.ErrorKey] = err.Error()
 		}
 	}
-
-	return &message{
-		hook.host,
-		entry.Time.UTC().Format(time.RFC3339Nano),
-		entry.Message,
-		entry.Data,
-		strings.ToUpper(level),
+	content, err := json.CamelCase(entry.Data)
+	if err != nil {
+		fmt.Printf("Struct -> Camel Case: %s", err)
 	}
+
+	result := map[string]interface{}{
+		"host": hook.host,
+		"@timestamp": entry.Time.UTC().Format(time.RFC3339Nano),
+		"message": entry.Message,
+		"level": strings.ToUpper(level),
+	}
+
+	for key, value := range content.(map[string]interface{}) {
+		if key != "host" && key != "@timestamp" && key != "message" && key != "level" {
+			result[key] = value
+		}
+	}
+
+	return &result
 }
 
 func syncFireFunc(entry *logrus.Entry, hook *ElasticHook) error {
