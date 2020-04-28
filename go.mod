@@ -1,4 +1,4 @@
-module gopkg.in/sohlich/elogrus.v7
+module gopkg.in/fossas/elogrus.v7
 
 go 1.12
 
