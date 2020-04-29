@@ -17,7 +17,13 @@ import (
 type NewHookFunc func(client *elastic.Client, host string, level logrus.Level, index string) (*ElasticHook, error)
 
 func TestSyncHook(t *testing.T) {
-	hookTest(NewElasticHook, "sync-log", t)
+	hookTest(func(client *elastic.Client, host string, level logrus.Level, index string) (hook *ElasticHook, err error) {
+		return NewElasticHook(client,CreateHookOptions{
+			Host:               host,
+			Level:              level,
+			Index:              index,
+		})
+	}, "sync-log", t)
 }
 
 func TestAsyncHook(t *testing.T) {
@@ -95,7 +101,11 @@ func TestError(t *testing.T) {
 		DeleteIndex("errorlog").
 		Do(context.TODO())
 
-	hook, err := NewElasticHook(client, "localhost", logrus.DebugLevel, "errorlog")
+	hook, err := NewElasticHook(client, CreateHookOptions{
+		Host:               "localhost",
+		Level:              logrus.DebugLevel,
+		Index:              "errorLog",
+	})
 	if err != nil {
 		log.Panic(err)
 		t.FailNow()
