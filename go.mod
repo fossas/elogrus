@@ -1,4 +1,4 @@
-module gopkg.in/fossas/elogrus.v7
+module github.com/fossas/elogrus
 
 go 1.12
 
